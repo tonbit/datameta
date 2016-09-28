@@ -1,9 +1,9 @@
-#ifndef CCLIENT_DATA_SOURCE_SQLITE_H_
-#define CCLIENT_DATA_SOURCE_SQLITE_H_
+#ifndef STDEX_DATA_SOURCE_SQLITE_H_
+#define STDEX_DATA_SOURCE_SQLITE_H_
 
 #include "data_meta.h"
 #include <sqlite3.h>
-namespace cclient {
+namespace stdex {
 
 class DataSourceSqlite
 {
@@ -29,4 +29,4 @@ private:
 };
 
 }
-#endif //CCLIENT_DATA_SOURCE_SQLITE_H_
+#endif //STDEX_DATA_SOURCE_SQLITE_H_

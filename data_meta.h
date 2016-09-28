@@ -17,71 +17,13 @@
  * under the License.
  */
 
-#ifndef CCLIENT_DATA_META_H_
-#define CCLIENT_DATA_META_H_
+#ifndef STDEX_DATA_META_H_
+#define STDEX_DATA_META_H_
 
-#include <limits.h>
-#include <stdint.h>
-#include <float.h>
-#include <assert.h>
-#include <errno.h>
-#include <stddef.h>
-#include <stdarg.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <time.h>
-#include <math.h>
-#include <ctype.h>
-#include <wctype.h>
-#include <locale.h>
-#include <wchar.h>
-
-#ifdef _MSC_VER
-
-#include <sys/types.h>
-#include <winsock2.h>
-#include <Ws2ipdef.h>
-#include <Ws2tcpip.h>
-
-#else //_MSC_VER
-
-#include <unistd.h>
-#include <net/if.h>
-#include <sys/types.h>
-#include <sys/param.h>
-#include <sys/time.h>
-#include <sys/stat.h>
-#include <sys/prctl.h>
-#include <sys/socket.h>
-#include <sys/ioctl.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <fcntl.h>
-
-#endif
-
-typedef uint64_t u64;
-typedef uint32_t u32;
-typedef uint16_t u16;
-typedef uint8_t  u8;
-
-typedef int64_t  i64;
-typedef int32_t  i32;
-typedef int16_t  i16;
-
-typedef float    f32;
-typedef double   f64;
-
-typedef unsigned long int ulong;
-typedef unsigned short int ushort;
-
+#include <cstdint>
+#include <cstring>
+#include <cstdio>
 #include <string>
-using std::string;
-using std::wstring;
-
 #include <array>
 #include <vector>
 #include <list>
@@ -90,7 +32,17 @@ using std::wstring;
 #include <set>
 #include <unordered_set>
 
-namespace cclient {
+#ifdef _MSC_VER
+#include <winsock2.h>
+#endif
+
+using std::string;
+using std::wstring;
+
+typedef unsigned long ulong;
+typedef unsigned short ushort;
+
+namespace stdex {
 
 class Meta
 {
@@ -120,31 +72,31 @@ public:
             _number = other._number;
     }
 
-    inline Meta(i32 val)
+    inline Meta(int32_t val)
     {
-        type = TYPE_INTEGER;
+        type = TYPE_INT;
         _number.number_i32 = val;
     }
 
-    inline Meta(u32 val)
+    inline Meta(uint32_t val)
     {
-        type = TYPE_INTEGER;
-        _number.number_i32 = (i32)val;
+        type = TYPE_INT;
+        _number.number_i32 = (int32_t)val;
     }
 
-    inline Meta(i64 val)
+    inline Meta(int64_t val)
     {
         type = TYPE_BIGINT;
         _number.number_i64 = val;
     }
 
-    inline Meta(f32 val)
+    inline Meta(float val)
     {
         type = TYPE_FLOAT;
         _number.number_f32 = val;
     }
 
-    inline Meta(f64 val)
+    inline Meta(double val)
     {
         type = TYPE_DOUBLE;
         _number.number_f64 = val;
@@ -192,35 +144,35 @@ public:
         return *this;
     }
 
-    inline Meta &operator=(i32 val)
+    inline Meta &operator=(int32_t val)
     {
-        type = TYPE_INTEGER;
+        type = TYPE_INT;
         _number.number_i32 = val;
         return *this;
     }
 
-    inline Meta &operator=(u32 val)
+    inline Meta &operator=(uint32_t val)
     {
-        type = TYPE_INTEGER;
-        _number.number_i32 = (i32)val;
+        type = TYPE_INT;
+        _number.number_i32 = (int32_t)val;
         return *this;
     }
 
-    inline Meta &operator=(i64 val)
+    inline Meta &operator=(int64_t val)
     {
         type = TYPE_BIGINT;
         _number.number_i64 = val;
         return *this;
     }
 
-    inline Meta &operator=(f32 val)
+    inline Meta &operator=(float val)
     {
         type = TYPE_FLOAT;
         _number.number_f32 = val;
         return *this;
     }
 
-    inline Meta &operator=(f64 val)
+    inline Meta &operator=(double val)
     {
         type = TYPE_DOUBLE;
         _number.number_f64 = val;
@@ -255,7 +207,7 @@ public:
 
     inline bool is_integer() const
     {
-    	return type == TYPE_INTEGER;
+    	return type == TYPE_INT;
     }
 
     inline bool is_bigint() const
@@ -278,22 +230,22 @@ public:
     	return type == TYPE_STRING;
     }
 
-    inline i32 &integer_ref()
+    inline int32_t &int_ref()
     {
         return _number.number_i32;
     }
 
-    inline i64 &bigint_ref()
+    inline int64_t &bigint_ref()
     {
         return _number.number_i64;
     }
 
-    inline f32 &float_ref()
+    inline float &float_ref()
     {
         return _number.number_f32;
     }
 
-    inline f64 &double_ref()
+    inline double &double_ref()
     {
         return _number.number_f64;
     }
@@ -303,22 +255,22 @@ public:
         return _string;
     }
 
-    inline i32 get_integer() const
+    inline int32_t get_int() const
     {
         return _number.number_i32;
     }
 
-    inline i64 get_bigint() const
+    inline int64_t get_bigint() const
     {
         return _number.number_i64;
     }
 
-    inline f32 get_float() const
+    inline float get_float() const
     {
         return _number.number_f32;
     }
 
-    inline f64 get_double() const
+    inline double get_double() const
     {
         return _number.number_f64;
     }
@@ -330,7 +282,7 @@ public:
 
     inline string to_string() const
     {
-    	if (type == TYPE_INTEGER)
+    	if (type == TYPE_INT)
     	{
     		return std::to_string(_number.number_i32);
     	}
@@ -358,7 +310,7 @@ private:
 	enum Type
 	{
 		TYPE_NULL,
-		TYPE_INTEGER,
+		TYPE_INT,
 		TYPE_BIGINT,
 		TYPE_FLOAT,
 		TYPE_DOUBLE,
@@ -369,10 +321,10 @@ private:
 
     union Number
     {
-    	i32 number_i32;
-    	i64 number_i64;
-    	f32 number_f32;
-    	f64 number_f64;
+    	int32_t number_i32;
+    	int64_t number_i64;
+    	float number_f32;
+    	double number_f64;
     };
 
     Number _number;
@@ -380,4 +332,4 @@ private:
 };
 
 }
-#endif //CCLIENT_DATA_META_H_
+#endif //STDEX_DATA_META_H_

@@ -18,224 +18,453 @@
  */
 
 #include "data_source_mysql.h"
-namespace cclient {
+namespace stdex {
 
-	DataSourceMysql::DataSourceMysql()
+DataSourceMysql::DataSourceMysql()
+{
+	mysql_init(&_dbase);
+	_ready = false;
+	_errno = 0;
+	_error = "";
+}
+
+DataSourceMysql::~DataSourceMysql()
+{
+	close();
+}
+
+bool DataSourceMysql::is_ready()
+{
+	return _ready;
+}
+
+int DataSourceMysql::open(const string &host, int port, const string &user, const string &passwd, const string &dbase)
+{
+	if (!mysql_real_connect(&_dbase, host.c_str(), user.c_str(), passwd.c_str(), dbase.c_str(), port, NULL, 0))
 	{
-		mysql_init(&_dbase);
+		_errno = mysql_errno(&_dbase);
+		_error = mysql_error(&_dbase);
+		return 1;
+	}
+
+	mysql_autocommit(&_dbase, 1);
+	_ready = true;
+	return 0;
+}
+
+void DataSourceMysql::close()
+{
+	if (_ready)
+	{
+		mysql_close(&_dbase);
 		_ready = false;
 	}
+}
 
-	DataSourceMysql::~DataSourceMysql()
+int DataSourceMysql::query(const string &sql, std::vector<Meta> &in, std::vector<Meta> &row)
+{
+	MYSQL_STMT *stmt = mysql_stmt_init(&_dbase);
+	if (!stmt)
 	{
-		close();
+		_errno = mysql_errno(&_dbase);
+		_error = mysql_error(&_dbase);
+		return 1;
 	}
 
-	bool DataSourceMysql::is_ready()
+	if (mysql_stmt_prepare(stmt, sql.c_str(), sql.size()))
 	{
-		return _ready;
+		_errno = mysql_errno(&_dbase);
+		_error = mysql_error(&_dbase);
+		mysql_stmt_close(stmt);
+		return 2;
 	}
 
-	int DataSourceMysql::open(const string &host, int port, const string &user, const string &passwd, const string &dbase)
+	std::vector<MYSQL_BIND> param_binds;
+	std::vector<ulong> param_lens;
+
+	if (!in.empty())
 	{
-		if (!mysql_real_connect(&_dbase, host.c_str(), user.c_str(), passwd.c_str(), dbase.c_str(), port, NULL, 0))
-			return 1;
+		param_binds.resize(in.size());
+		param_lens.resize(in.size());
 
-		mysql_autocommit(&_dbase, 1);
-		_ready = true;
-		return 0;
-	}
-
-	void DataSourceMysql::close()
-	{
-		if (_ready)
+		for (size_t i = 0; i < in.size(); i++)
 		{
-			mysql_close(&_dbase);
-			_ready = false;
-		}
-	}
-
-	int DataSourceMysql::query(const string &sql, std::vector<Meta> &in, std::vector<Meta> &row)
-	{
-		MYSQL_STMT *stmt = mysql_stmt_init(&_dbase);
-		if (!stmt)
-			return 1;
-
-		if (mysql_stmt_prepare(stmt, sql.c_str(), sql.size()))
-		{
-			mysql_stmt_close(stmt);
-			return 2;
-		}
-
-		std::vector<MYSQL_BIND> param_binds;
-		std::vector<ulong> param_lens;
-
-		if (!in.empty())
-		{
-			param_binds.resize(in.size());
-			param_lens.resize(in.size());
-
-			for (size_t i = 0; i < in.size(); i++)
-			{
-				MYSQL_BIND &bind = param_binds[i];
-				memset(&bind, 0, sizeof(bind));
-				ulong &len = param_lens[i];
-				Meta &meta = in[i];
-
-				if (meta.is_integer())
-				{
-					i32 &val = meta.integer_ref();
-
-					bind.buffer_type = MYSQL_TYPE_LONG;
-					bind.buffer = (char *)&val;
-				}
-				else if (meta.is_bigint())
-				{
-					i64 &val = meta.bigint_ref();
-
-					bind.buffer_type = MYSQL_TYPE_LONGLONG;
-					bind.buffer = (char *)&val;
-				}
-				else if (meta.is_float())
-				{
-					f32 &val = meta.float_ref();
-
-					bind.buffer_type = MYSQL_TYPE_FLOAT;
-					bind.buffer = (char *)&val;
-				}
-				else if (meta.is_double())
-				{
-					f64 &val = meta.double_ref();
-
-					bind.buffer_type = MYSQL_TYPE_DOUBLE;
-					bind.buffer = (char *)&val;
-				}
-				else if (meta.is_string())
-				{
-					string &val = meta.string_ref();
-					len = val.size();
-
-					bind.buffer_type = MYSQL_TYPE_STRING;
-					bind.buffer = (char *)&val[0];
-					bind.buffer_length = len;
-					bind.length = &len;
-				}
-				else
-				{
-					bind.buffer_type = MYSQL_TYPE_NULL;
-					bind.buffer = NULL;
-				}
-			}
-
-			if (mysql_stmt_bind_param(stmt, &param_binds[0]))
-			{
-				mysql_stmt_close(stmt);
-				return 3;
-			}
-		}
-
-		if (mysql_stmt_execute(stmt))
-		{
-			mysql_stmt_close(stmt);
-			return 4;
-		}
-
-		MYSQL_RES *result_meta = mysql_stmt_result_metadata(stmt);
-		if (!result_meta)
-		{
-			mysql_stmt_close(stmt);
-			return 5;
-		}
-
-		MYSQL_FIELD *fields = mysql_fetch_fields(result_meta);
-		u32 field_num = mysql_num_fields(result_meta);
-		mysql_free_result(result_meta);
-
-		std::vector<MYSQL_BIND> result_binds;
-		std::vector<my_bool> isnull_vec;
-		std::vector<ulong> length_vec;
-
-		row.resize(field_num);
-		result_binds.resize(field_num);
-		isnull_vec.resize(field_num);
-		length_vec.resize(field_num);
-
-		for (u32 i = 0; i < field_num; i++)
-		{
-			MYSQL_BIND &bind = result_binds[i];
+			MYSQL_BIND &bind = param_binds[i];
 			memset(&bind, 0, sizeof(bind));
+			ulong &len = param_lens[i];
+			Meta &meta = in[i];
 
-			MYSQL_FIELD &field = fields[i];
-			Meta &meta = row[i];
-			my_bool &isnull = isnull_vec[i];
-			ulong &length = length_vec[i];
-
-			if (field.type == MYSQL_TYPE_TINY || field.type == MYSQL_TYPE_SHORT || field.type == MYSQL_TYPE_LONG)
+			if (meta.is_integer())
 			{
-				meta = (i32)0;
-				i32 &val = meta.integer_ref();
+				int32_t &val = meta.int_ref();
 
 				bind.buffer_type = MYSQL_TYPE_LONG;
 				bind.buffer = (char *)&val;
-				bind.is_null = &isnull;
 			}
-			else if (field.type == MYSQL_TYPE_LONGLONG)
+			else if (meta.is_bigint())
 			{
-				meta = (i64)0;
-				i64 &val = meta.bigint_ref();
+				int64_t &val = meta.bigint_ref();
 
 				bind.buffer_type = MYSQL_TYPE_LONGLONG;
 				bind.buffer = (char *)&val;
-				bind.is_null = &isnull;
 			}
-			else if (field.type == MYSQL_TYPE_FLOAT)
+			else if (meta.is_float())
 			{
-				meta = (f32)0;
-				f32 &val = meta.float_ref();
+				float &val = meta.float_ref();
 
 				bind.buffer_type = MYSQL_TYPE_FLOAT;
 				bind.buffer = (char *)&val;
-				bind.is_null = &isnull;
 			}
-			else if (field.type == MYSQL_TYPE_DOUBLE)
+			else if (meta.is_double())
 			{
-				meta = (f64)0;
-				f64 &val = meta.double_ref();
+				double &val = meta.double_ref();
 
 				bind.buffer_type = MYSQL_TYPE_DOUBLE;
 				bind.buffer = (char *)&val;
-				bind.is_null = &isnull;
 			}
-			else if (field.type == MYSQL_TYPE_STRING || field.type == MYSQL_TYPE_VAR_STRING)
+			else if (meta.is_string())
 			{
-				meta = "";
 				string &val = meta.string_ref();
-				val.resize(field.length);
+				len = val.size();
 
-				bind.buffer_type = field.type;
+				bind.buffer_type = MYSQL_TYPE_STRING;
 				bind.buffer = (char *)&val[0];
-				bind.buffer_length = val.size();
-				bind.length = &length;
-				bind.is_null = &isnull;
+				bind.buffer_length = len;
+				bind.length = &len;
+			}
+			else
+			{
+				bind.buffer_type = MYSQL_TYPE_NULL;
+				bind.buffer = NULL;
 			}
 		}
 
-		if (mysql_stmt_bind_result(stmt, &result_binds[0]))
+		if (mysql_stmt_bind_param(stmt, &param_binds[0]))
 		{
+			_errno = mysql_errno(&_dbase);
+			_error = mysql_error(&_dbase);
 			mysql_stmt_close(stmt);
-			return 6;
+			return 3;
+		}
+	}
+
+	if (mysql_stmt_execute(stmt))
+	{
+		_errno = mysql_errno(&_dbase);
+		_error = mysql_error(&_dbase);
+		mysql_stmt_close(stmt);
+		return 4;
+	}
+
+	MYSQL_RES *result_meta = mysql_stmt_result_metadata(stmt);
+	if (!result_meta)
+	{
+		_errno = mysql_errno(&_dbase);
+		_error = mysql_error(&_dbase);
+		mysql_stmt_close(stmt);
+		return 5;
+	}
+
+	MYSQL_FIELD *fields = mysql_fetch_fields(result_meta);
+	unsigned field_num = mysql_num_fields(result_meta);
+	mysql_free_result(result_meta);
+
+	std::vector<MYSQL_BIND> result_binds;
+	std::vector<my_bool> isnull_vec;
+	std::vector<ulong> length_vec;
+
+	row.resize(field_num);
+	result_binds.resize(field_num);
+	isnull_vec.resize(field_num);
+	length_vec.resize(field_num);
+
+	for (unsigned i = 0; i < field_num; i++)
+	{
+		MYSQL_BIND &bind = result_binds[i];
+		memset(&bind, 0, sizeof(bind));
+
+		MYSQL_FIELD &field = fields[i];
+		Meta &meta = row[i];
+		my_bool &isnull = isnull_vec[i];
+		ulong &length = length_vec[i];
+
+		if (field.type == MYSQL_TYPE_TINY || field.type == MYSQL_TYPE_SHORT || field.type == MYSQL_TYPE_LONG)
+		{
+			meta = (int32_t)0;
+			int32_t &val = meta.int_ref();
+
+			bind.buffer_type = MYSQL_TYPE_LONG;
+			bind.buffer = (char *)&val;
+			bind.is_null = &isnull;
+		}
+		else if (field.type == MYSQL_TYPE_LONGLONG)
+		{
+			meta = (int64_t)0;
+			int64_t &val = meta.bigint_ref();
+
+			bind.buffer_type = MYSQL_TYPE_LONGLONG;
+			bind.buffer = (char *)&val;
+			bind.is_null = &isnull;
+		}
+		else if (field.type == MYSQL_TYPE_FLOAT)
+		{
+			meta = (float)0;
+			float &val = meta.float_ref();
+
+			bind.buffer_type = MYSQL_TYPE_FLOAT;
+			bind.buffer = (char *)&val;
+			bind.is_null = &isnull;
+		}
+		else if (field.type == MYSQL_TYPE_DOUBLE)
+		{
+			meta = (double)0;
+			double &val = meta.double_ref();
+
+			bind.buffer_type = MYSQL_TYPE_DOUBLE;
+			bind.buffer = (char *)&val;
+			bind.is_null = &isnull;
+		}
+		else if (field.type == MYSQL_TYPE_STRING || field.type == MYSQL_TYPE_VAR_STRING)
+		{
+			meta = "";
+			string &val = meta.string_ref();
+			val.resize(field.length);
+
+			bind.buffer_type = field.type;
+			bind.buffer = (char *)&val[0];
+			bind.buffer_length = val.size();
+			bind.length = &length;
+			bind.is_null = &isnull;
+		}
+	}
+
+	if (mysql_stmt_bind_result(stmt, &result_binds[0]))
+	{
+		_errno = mysql_errno(&_dbase);
+		_error = mysql_error(&_dbase);
+		mysql_stmt_close(stmt);
+		return 6;
+	}
+
+	int ret = mysql_stmt_fetch(stmt);
+	if (ret)
+	{
+		_errno = mysql_errno(&_dbase);
+		_error = mysql_error(&_dbase);
+		mysql_stmt_close(stmt);
+		return 7;
+	}
+
+	for (unsigned i = 0; i < field_num; i++)
+	{
+		Meta &meta = row[i];
+		my_bool &isnull = isnull_vec[i];
+		ulong &length = length_vec[i];
+
+		if (isnull)
+			meta = Meta();
+
+		if (meta.is_string())
+			meta.string_ref().resize(length);
+	}
+
+	mysql_stmt_close(stmt);
+	return 0;
+}
+
+int DataSourceMysql::query_all(const string &sql, std::vector<Meta> &in, std::vector<std::vector<Meta>> &rows)
+{
+	MYSQL_STMT *stmt = mysql_stmt_init(&_dbase);
+	if (!stmt)
+	{
+		_errno = mysql_errno(&_dbase);
+		_error = mysql_error(&_dbase);
+		return 1;
+	}
+
+	if (mysql_stmt_prepare(stmt, sql.c_str(), sql.size()))
+	{
+		_errno = mysql_errno(&_dbase);
+		_error = mysql_error(&_dbase);
+		mysql_stmt_close(stmt);
+		return 2;
+	}
+
+	std::vector<MYSQL_BIND> param_binds;
+	std::vector<ulong> param_lens;
+
+	if (!in.empty())
+	{
+		param_binds.resize(in.size());
+		param_lens.resize(in.size());
+
+		for (size_t i = 0; i < in.size(); i++)
+		{
+			MYSQL_BIND &bind = param_binds[i];
+			memset(&bind, 0, sizeof(bind));
+			ulong &len = param_lens[i];
+			Meta &meta = in[i];
+
+			if (meta.is_integer())
+			{
+				int32_t &val = meta.int_ref();
+
+				bind.buffer_type = MYSQL_TYPE_LONG;
+				bind.buffer = (char *)&val;
+			}
+			else if (meta.is_bigint())
+			{
+				int64_t &val = meta.bigint_ref();
+
+				bind.buffer_type = MYSQL_TYPE_LONGLONG;
+				bind.buffer = (char *)&val;
+			}
+			else if (meta.is_float())
+			{
+				float &val = meta.float_ref();
+
+				bind.buffer_type = MYSQL_TYPE_FLOAT;
+				bind.buffer = (char *)&val;
+			}
+			else if (meta.is_double())
+			{
+				double &val = meta.double_ref();
+
+				bind.buffer_type = MYSQL_TYPE_DOUBLE;
+				bind.buffer = (char *)&val;
+			}
+			else if (meta.is_string())
+			{
+				string &val = meta.string_ref();
+				len = val.size();
+
+				bind.buffer_type = MYSQL_TYPE_STRING;
+				bind.buffer = (char *)&val[0];
+				bind.buffer_length = len;
+				bind.length = &len;
+			}
+			else
+			{
+				bind.buffer_type = MYSQL_TYPE_NULL;
+				bind.buffer = NULL;
+			}
 		}
 
-		int ret = mysql_stmt_fetch(stmt);
-		if (ret)
+		if (mysql_stmt_bind_param(stmt, &param_binds[0]))
 		{
+			_errno = mysql_errno(&_dbase);
+			_error = mysql_error(&_dbase);
 			mysql_stmt_close(stmt);
-			return 7;
+			return 3;
 		}
+	}
 
-		for (u32 i = 0; i < field_num; i++)
+	if (mysql_stmt_execute(stmt))
+	{
+		_errno = mysql_errno(&_dbase);
+		_error = mysql_error(&_dbase);
+		mysql_stmt_close(stmt);
+		return 4;
+	}
+
+	MYSQL_RES *result_meta = mysql_stmt_result_metadata(stmt);
+	if (!result_meta)
+	{
+		_errno = mysql_errno(&_dbase);
+		_error = mysql_error(&_dbase);
+		mysql_stmt_close(stmt);
+		return 5;
+	}
+
+	MYSQL_FIELD *fields = mysql_fetch_fields(result_meta);
+	unsigned field_num = mysql_num_fields(result_meta);
+	mysql_free_result(result_meta);
+
+	std::vector<MYSQL_BIND> result_binds;
+	std::vector<Meta> row;
+	std::vector<my_bool> isnull_vec;
+	std::vector<ulong> length_vec;
+
+	result_binds.resize(field_num);
+	row.resize(field_num);
+	isnull_vec.resize(field_num);
+	length_vec.resize(field_num);
+
+	for (unsigned i = 0; i < field_num; i++)
+	{
+		MYSQL_BIND &bind = result_binds[i];
+		memset(&bind, 0, sizeof(bind));
+
+		MYSQL_FIELD &field = fields[i];
+		Meta &meta = row[i];
+		my_bool &isnull = isnull_vec[i];
+		ulong &length = length_vec[i];
+
+		if (field.type == MYSQL_TYPE_LONG)
 		{
-			Meta &meta = row[i];
+			meta = (int32_t)0;
+			int32_t &val = meta.int_ref();
+
+			bind.buffer_type = MYSQL_TYPE_LONG;
+			bind.buffer = (char *)&val;
+			bind.is_null = &isnull;
+		}
+		else if (field.type == MYSQL_TYPE_LONGLONG)
+		{
+			meta = (int64_t)0;
+			int64_t &val = meta.bigint_ref();
+
+			bind.buffer_type = MYSQL_TYPE_LONGLONG;
+			bind.buffer = (char *)&val;
+			bind.is_null = &isnull;
+		}
+		else if (field.type == MYSQL_TYPE_FLOAT)
+		{
+			meta = (float)0;
+			float &val = meta.float_ref();
+
+			bind.buffer_type = MYSQL_TYPE_FLOAT;
+			bind.buffer = (char *)&val;
+			bind.is_null = &isnull;
+		}
+		else if (field.type == MYSQL_TYPE_DOUBLE)
+		{
+			meta = (double)0;
+			double &val = meta.double_ref();
+
+			bind.buffer_type = MYSQL_TYPE_DOUBLE;
+			bind.buffer = (char *)&val;
+			bind.is_null = &isnull;
+		}
+		else if (field.type == MYSQL_TYPE_STRING || field.type == MYSQL_TYPE_VAR_STRING)
+		{
+			meta = "";
+			string &val = meta.string_ref();
+			val.resize(field.length);
+
+			bind.buffer_type = field.type;
+			bind.buffer = (char *)&val[0];
+			bind.buffer_length = val.size();
+			bind.length = &length;
+			bind.is_null = &isnull;
+		}
+	}
+
+	if (mysql_stmt_bind_result(stmt, &result_binds[0]))
+	{
+		_errno = mysql_errno(&_dbase);
+		_error = mysql_error(&_dbase);
+		mysql_stmt_close(stmt);
+		return 6;
+	}
+
+	while (!mysql_stmt_fetch(stmt))
+	{
+		std::vector<Meta> tmp = row;
+
+		for (unsigned i = 0; i < field_num; i++)
+		{
+			Meta &meta = tmp[i];
 			my_bool &isnull = isnull_vec[i];
 			ulong &length = length_vec[i];
 
@@ -246,404 +475,237 @@ namespace cclient {
 				meta.string_ref().resize(length);
 		}
 
-		mysql_stmt_close(stmt);
-		return 0;
+		rows.push_back(std::move(tmp));
 	}
 
-	int DataSourceMysql::query_all(const string &sql, std::vector<Meta> &in, std::vector<std::vector<Meta>> &rows)
+	mysql_stmt_close(stmt);
+	return 0;
+}
+
+
+int DataSourceMysql::insert(const string &sql, std::vector<Meta> &in, int64_t *insert_id)
+{
+	MYSQL_STMT *stmt = mysql_stmt_init(&_dbase);
+	if (!stmt)
 	{
-		MYSQL_STMT *stmt = mysql_stmt_init(&_dbase);
-		if (!stmt)
-			return 1;
+		_errno = mysql_errno(&_dbase);
+		_error = mysql_error(&_dbase);
+		return 1;
+	}
 
-		if (mysql_stmt_prepare(stmt, sql.c_str(), sql.size()))
+	if (mysql_stmt_prepare(stmt, sql.c_str(), sql.size()))
+	{
+		_errno = mysql_errno(&_dbase);
+		_error = mysql_error(&_dbase);
+		mysql_stmt_close(stmt);
+		return 2;
+	}
+
+	std::vector<MYSQL_BIND> param_binds;
+	std::vector<ulong> param_lens;
+
+	if (!in.empty())
+	{
+		param_binds.resize(in.size());
+		param_lens.resize(in.size());
+
+		for (size_t i = 0; i < in.size(); i++)
 		{
-			mysql_stmt_close(stmt);
-			return 2;
-		}
-
-		std::vector<MYSQL_BIND> param_binds;
-		std::vector<ulong> param_lens;
-
-		if (!in.empty())
-		{
-			param_binds.resize(in.size());
-			param_lens.resize(in.size());
-
-			for (size_t i = 0; i < in.size(); i++)
-			{
-				MYSQL_BIND &bind = param_binds[i];
-				memset(&bind, 0, sizeof(bind));
-				ulong &len = param_lens[i];
-				Meta &meta = in[i];
-
-				if (meta.is_integer())
-				{
-					i32 &val = meta.integer_ref();
-
-					bind.buffer_type = MYSQL_TYPE_LONG;
-					bind.buffer = (char *)&val;
-				}
-				else if (meta.is_bigint())
-				{
-					i64 &val = meta.bigint_ref();
-
-					bind.buffer_type = MYSQL_TYPE_LONGLONG;
-					bind.buffer = (char *)&val;
-				}
-				else if (meta.is_float())
-				{
-					f32 &val = meta.float_ref();
-
-					bind.buffer_type = MYSQL_TYPE_FLOAT;
-					bind.buffer = (char *)&val;
-				}
-				else if (meta.is_double())
-				{
-					f64 &val = meta.double_ref();
-
-					bind.buffer_type = MYSQL_TYPE_DOUBLE;
-					bind.buffer = (char *)&val;
-				}
-				else if (meta.is_string())
-				{
-					string &val = meta.string_ref();
-					len = val.size();
-
-					bind.buffer_type = MYSQL_TYPE_STRING;
-					bind.buffer = (char *)&val[0];
-					bind.buffer_length = len;
-					bind.length = &len;
-				}
-				else
-				{
-					bind.buffer_type = MYSQL_TYPE_NULL;
-					bind.buffer = NULL;
-				}
-			}
-
-			if (mysql_stmt_bind_param(stmt, &param_binds[0]))
-			{
-				mysql_stmt_close(stmt);
-				return 3;
-			}
-		}
-
-		if (mysql_stmt_execute(stmt))
-		{
-			mysql_stmt_close(stmt);
-			return 4;
-		}
-
-		MYSQL_RES *result_meta = mysql_stmt_result_metadata(stmt);
-		if (!result_meta)
-		{
-			mysql_stmt_close(stmt);
-			return 5;
-		}
-
-		MYSQL_FIELD *fields = mysql_fetch_fields(result_meta);
-		u32 field_num = mysql_num_fields(result_meta);
-		mysql_free_result(result_meta);
-
-		std::vector<MYSQL_BIND> result_binds;
-		std::vector<Meta> row;
-		std::vector<my_bool> isnull_vec;
-		std::vector<ulong> length_vec;
-
-		result_binds.resize(field_num);
-		row.resize(field_num);
-		isnull_vec.resize(field_num);
-		length_vec.resize(field_num);
-
-		for (u32 i = 0; i < field_num; i++)
-		{
-			MYSQL_BIND &bind = result_binds[i];
+			MYSQL_BIND &bind = param_binds[i];
 			memset(&bind, 0, sizeof(bind));
+			ulong &len = param_lens[i];
+			Meta &meta = in[i];
 
-			MYSQL_FIELD &field = fields[i];
-			Meta &meta = row[i];
-			my_bool &isnull = isnull_vec[i];
-			ulong &length = length_vec[i];
-
-			if (field.type == MYSQL_TYPE_LONG)
+			if (meta.is_integer())
 			{
-				meta = (i32)0;
-				i32 &val = meta.integer_ref();
+				int32_t &val = meta.int_ref();
 
 				bind.buffer_type = MYSQL_TYPE_LONG;
 				bind.buffer = (char *)&val;
-				bind.is_null = &isnull;
 			}
-			else if (field.type == MYSQL_TYPE_LONGLONG)
+			else if (meta.is_bigint())
 			{
-				meta = (i64)0;
-				i64 &val = meta.bigint_ref();
+				int64_t &val = meta.bigint_ref();
 
 				bind.buffer_type = MYSQL_TYPE_LONGLONG;
 				bind.buffer = (char *)&val;
-				bind.is_null = &isnull;
 			}
-			else if (field.type == MYSQL_TYPE_FLOAT)
+			else if (meta.is_float())
 			{
-				meta = (f32)0;
-				f32 &val = meta.float_ref();
+				float &val = meta.float_ref();
 
 				bind.buffer_type = MYSQL_TYPE_FLOAT;
 				bind.buffer = (char *)&val;
-				bind.is_null = &isnull;
 			}
-			else if (field.type == MYSQL_TYPE_DOUBLE)
+			else if (meta.is_double())
 			{
-				meta = (f64)0;
-				f64 &val = meta.double_ref();
+				double &val = meta.double_ref();
 
 				bind.buffer_type = MYSQL_TYPE_DOUBLE;
 				bind.buffer = (char *)&val;
-				bind.is_null = &isnull;
 			}
-			else if (field.type == MYSQL_TYPE_STRING || field.type == MYSQL_TYPE_VAR_STRING)
+			else if (meta.is_string())
 			{
-				meta = "";
 				string &val = meta.string_ref();
-				val.resize(field.length);
+				len = val.size();
 
-				bind.buffer_type = field.type;
+				bind.buffer_type = MYSQL_TYPE_STRING;
 				bind.buffer = (char *)&val[0];
-				bind.buffer_length = val.size();
-				bind.length = &length;
-				bind.is_null = &isnull;
+				bind.buffer_length = len;
+				bind.length = &len;
 			}
-		}
-
-		if (mysql_stmt_bind_result(stmt, &result_binds[0]))
-		{
-			mysql_stmt_close(stmt);
-			return 6;
-		}
-
-		while (!mysql_stmt_fetch(stmt))
-		{
-			for (u32 i = 0; i < field_num; i++)
+			else
 			{
-				Meta &meta = row[i];
-				my_bool &isnull = isnull_vec[i];
-				ulong &length = length_vec[i];
-
-				if (isnull)
-					meta = Meta();
-
-				if (meta.is_string())
-					meta.string_ref().resize(length);
+				bind.buffer_type = MYSQL_TYPE_NULL;
+				bind.buffer = NULL;
 			}
-
-			rows.push_back(row);
 		}
 
+		if (mysql_stmt_bind_param(stmt, &param_binds[0]))
+		{
+			_errno = mysql_errno(&_dbase);
+			_error = mysql_error(&_dbase);
+			return 3;
+		}
+	}
+
+	if (mysql_stmt_execute(stmt))
+	{
+		_errno = mysql_errno(&_dbase);
+		_error = mysql_error(&_dbase);
 		mysql_stmt_close(stmt);
-		return 0;
+		return 4;
 	}
 
+	if (insert_id)
+		*insert_id = mysql_stmt_insert_id(stmt);
 
-	int DataSourceMysql::insert(const string &sql, std::vector<Meta> &in, i64 *insert_id)
+	mysql_stmt_close(stmt);
+	return 0;
+}
+
+int DataSourceMysql::execute(const string &sql, std::vector<Meta> &in, int64_t *affected)
+{
+	MYSQL_STMT *stmt = mysql_stmt_init(&_dbase);
+	if (!stmt)
 	{
-		MYSQL_STMT *stmt = mysql_stmt_init(&_dbase);
-		if (!stmt)
-			return 1;
+		_errno = mysql_errno(&_dbase);
+		_error = mysql_error(&_dbase);
+		return 1;
+	}
 
-		if (mysql_stmt_prepare(stmt, sql.c_str(), sql.size()))
-		{
-			mysql_stmt_close(stmt);
-			return 2;
-		}
-
-		std::vector<MYSQL_BIND> param_binds;
-		std::vector<ulong> param_lens;
-
-		if (!in.empty())
-		{
-			param_binds.resize(in.size());
-			param_lens.resize(in.size());
-
-			for (size_t i = 0; i < in.size(); i++)
-			{
-				MYSQL_BIND &bind = param_binds[i];
-				memset(&bind, 0, sizeof(bind));
-				ulong &len = param_lens[i];
-				Meta &meta = in[i];
-
-				if (meta.is_integer())
-				{
-					i32 &val = meta.integer_ref();
-
-					bind.buffer_type = MYSQL_TYPE_LONG;
-					bind.buffer = (char *)&val;
-				}
-				else if (meta.is_bigint())
-				{
-					i64 &val = meta.bigint_ref();
-
-					bind.buffer_type = MYSQL_TYPE_LONGLONG;
-					bind.buffer = (char *)&val;
-				}
-				else if (meta.is_float())
-				{
-					f32 &val = meta.float_ref();
-
-					bind.buffer_type = MYSQL_TYPE_FLOAT;
-					bind.buffer = (char *)&val;
-				}
-				else if (meta.is_double())
-				{
-					f64 &val = meta.double_ref();
-
-					bind.buffer_type = MYSQL_TYPE_DOUBLE;
-					bind.buffer = (char *)&val;
-				}
-				else if (meta.is_string())
-				{
-					string &val = meta.string_ref();
-					len = val.size();
-
-					bind.buffer_type = MYSQL_TYPE_STRING;
-					bind.buffer = (char *)&val[0];
-					bind.buffer_length = len;
-					bind.length = &len;
-				}
-				else
-				{
-					bind.buffer_type = MYSQL_TYPE_NULL;
-					bind.buffer = NULL;
-				}
-			}
-
-			if (mysql_stmt_bind_param(stmt, &param_binds[0]))
-				return 3;
-		}
-
-		if (mysql_stmt_execute(stmt))
-		{
-			mysql_stmt_close(stmt);
-			return 4;
-		}
-
-		if (insert_id)
-			*insert_id = mysql_stmt_insert_id(stmt);
-
+	if (mysql_stmt_prepare(stmt, sql.c_str(), sql.size()))
+	{
+		_errno = mysql_errno(&_dbase);
+		_error = mysql_error(&_dbase);
 		mysql_stmt_close(stmt);
-		return 0;
+		return 2;
 	}
 
-	int DataSourceMysql::execute(const string &sql, std::vector<Meta> &in, i64 *affected)
+	std::vector<MYSQL_BIND> param_binds;
+	std::vector<ulong> param_lens;
+
+	if (!in.empty())
 	{
-		MYSQL_STMT *stmt = mysql_stmt_init(&_dbase);
-		if (!stmt)
-			return 1;
+		param_binds.resize(in.size());
+		param_lens.resize(in.size());
 
-		if (mysql_stmt_prepare(stmt, sql.c_str(), sql.size()))
+		for (size_t i = 0; i < in.size(); i++)
 		{
-			mysql_stmt_close(stmt);
-			return 2;
-		}
+			MYSQL_BIND &bind = param_binds[i];
+			memset(&bind, 0, sizeof(bind));
+			ulong &len = param_lens[i];
+			Meta &meta = in[i];
 
-		std::vector<MYSQL_BIND> param_binds;
-		std::vector<ulong> param_lens;
-
-		if (!in.empty())
-		{
-			param_binds.resize(in.size());
-			param_lens.resize(in.size());
-
-			for (size_t i = 0; i < in.size(); i++)
+			if (meta.is_integer())
 			{
-				MYSQL_BIND &bind = param_binds[i];
-				memset(&bind, 0, sizeof(bind));
-				ulong &len = param_lens[i];
-				Meta &meta = in[i];
+				int32_t &val = meta.int_ref();
 
-				if (meta.is_integer())
-				{
-					i32 &val = meta.integer_ref();
-
-					bind.buffer_type = MYSQL_TYPE_LONG;
-					bind.buffer = (char *)&val;
-				}
-				else if (meta.is_bigint())
-				{
-					i64 &val = meta.bigint_ref();
-
-					bind.buffer_type = MYSQL_TYPE_LONGLONG;
-					bind.buffer = (char *)&val;
-				}
-				else if (meta.is_float())
-				{
-					f32 &val = meta.float_ref();
-
-					bind.buffer_type = MYSQL_TYPE_FLOAT;
-					bind.buffer = (char *)&val;
-				}
-				else if (meta.is_double())
-				{
-					f64 &val = meta.double_ref();
-
-					bind.buffer_type = MYSQL_TYPE_DOUBLE;
-					bind.buffer = (char *)&val;
-				}
-				else if (meta.is_string())
-				{
-					string &val = meta.string_ref();
-					len = val.size();
-
-					bind.buffer_type = MYSQL_TYPE_STRING;
-					bind.buffer = (char *)&val[0];
-					bind.buffer_length = len;
-					bind.length = &len;
-				}
-				else
-				{
-					bind.buffer_type = MYSQL_TYPE_NULL;
-					bind.buffer = NULL;
-				}
+				bind.buffer_type = MYSQL_TYPE_LONG;
+				bind.buffer = (char *)&val;
 			}
-
-			if (mysql_stmt_bind_param(stmt, &param_binds[0]))
+			else if (meta.is_bigint())
 			{
-				mysql_stmt_close(stmt);
-				return 3;
+				int64_t &val = meta.bigint_ref();
+
+				bind.buffer_type = MYSQL_TYPE_LONGLONG;
+				bind.buffer = (char *)&val;
+			}
+			else if (meta.is_float())
+			{
+				float &val = meta.float_ref();
+
+				bind.buffer_type = MYSQL_TYPE_FLOAT;
+				bind.buffer = (char *)&val;
+			}
+			else if (meta.is_double())
+			{
+				double &val = meta.double_ref();
+
+				bind.buffer_type = MYSQL_TYPE_DOUBLE;
+				bind.buffer = (char *)&val;
+			}
+			else if (meta.is_string())
+			{
+				string &val = meta.string_ref();
+				len = val.size();
+
+				bind.buffer_type = MYSQL_TYPE_STRING;
+				bind.buffer = (char *)&val[0];
+				bind.buffer_length = len;
+				bind.length = &len;
+			}
+			else
+			{
+				bind.buffer_type = MYSQL_TYPE_NULL;
+				bind.buffer = NULL;
 			}
 		}
 
-		if (mysql_stmt_execute(stmt))
+		if (mysql_stmt_bind_param(stmt, &param_binds[0]))
 		{
+			_errno = mysql_errno(&_dbase);
+			_error = mysql_error(&_dbase);
 			mysql_stmt_close(stmt);
-			return 4;
+			return 3;
 		}
+	}
 
-		if (affected)
-			*affected = mysql_stmt_affected_rows(stmt);
-
+	if (mysql_stmt_execute(stmt))
+	{
+		_errno = mysql_errno(&_dbase);
+		_error = mysql_error(&_dbase);
 		mysql_stmt_close(stmt);
-		return 0;
+		return 4;
 	}
 
-	int DataSourceMysql::execute(const string &sql)
+	if (affected)
+		*affected = mysql_stmt_affected_rows(stmt);
+
+	mysql_stmt_close(stmt);
+	return 0;
+}
+
+int DataSourceMysql::execute(const string &sql)
+{
+	if (mysql_query(&_dbase, sql.c_str()))
 	{
-		if (mysql_query(&_dbase, sql.c_str()))
-		{
-			return 1;
-		}
-
-		return 0;
+		_errno = mysql_errno(&_dbase);
+		_error = mysql_error(&_dbase);
+		return 1;
 	}
 
-	u32 DataSourceMysql::last_errno()
-	{
-		return mysql_errno(&_dbase);
-	}
+	return 0;
+}
 
-	const char *DataSourceMysql::last_error()
-	{
-		return mysql_error(&_dbase);
-	}
+unsigned DataSourceMysql::last_errno()
+{
+	return _errno;
+}
+
+string DataSourceMysql::last_error()
+{
+	return _error;
+}
 
 }

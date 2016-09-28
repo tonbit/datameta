@@ -18,7 +18,7 @@
  */
 
 #include "data_source_oracle.h"
-namespace cclient {
+namespace stdex {
 
 DataSourceOracle::DataSourceOracle()
 {

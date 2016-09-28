@@ -1,9 +1,9 @@
-#ifndef CCLIENT_DATA_SOURCE_ORACLE_H_
-#define CCLIENT_DATA_SOURCE_ORACLE_H_
+#ifndef STDEX_DATA_SOURCE_ORACLE_H_
+#define STDEX_DATA_SOURCE_ORACLE_H_
 
 #include "data_meta.h"
 #include <ocilib.h>
-namespace cclient {
+namespace stdex {
 
 class DataSourceOracle
 {
@@ -29,4 +29,4 @@ private:
 };
 
 }
-#endif //CCLIENT_DATA_SOURCE_ORACLE_H_
+#endif //STDEX_DATA_SOURCE_ORACLE_H_

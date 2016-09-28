@@ -18,7 +18,7 @@
  */
 
 #include "data_source_sqlite.h"
-namespace cclient {
+namespace stdex {
 
 DataSourceSqlite::DataSourceSqlite()
 {
