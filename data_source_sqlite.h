@@ -1,5 +1,6 @@
 #ifndef STDEX_DATA_SOURCE_SQLITE_H_
 #define STDEX_DATA_SOURCE_SQLITE_H_
+#ifdef STDEX_HAS_SQLITE
 
 #include "data_meta.h"
 #include <sqlite3.h>
@@ -29,4 +30,5 @@ private:
 };
 
 }
+#endif
 #endif //STDEX_DATA_SOURCE_SQLITE_H_

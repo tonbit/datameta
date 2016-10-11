@@ -17,6 +17,7 @@
  * under the License.
  */
 
+#ifdef STDEX_HAS_SQLITE
 #include "data_source_sqlite.h"
 namespace stdex {
 
@@ -422,3 +423,4 @@ const char *DataSourceSqlite::last_error()
 }
 
 }
+#endif

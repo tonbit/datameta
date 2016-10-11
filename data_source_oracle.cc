@@ -17,6 +17,7 @@
  * under the License.
  */
 
+#ifdef STDEX_HAS_ORACLE
 #include "data_source_oracle.h"
 namespace stdex {
 
@@ -526,3 +527,4 @@ const char *DataSourceOracle::last_error()
 }
 
 }
+#endif

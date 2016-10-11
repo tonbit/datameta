@@ -19,6 +19,7 @@
 
 #ifndef STDEX_DATA_SOURCE_MYSQL_H_
 #define STDEX_DATA_SOURCE_MYSQL_H_
+#ifdef STDEX_HAS_MYSQL
 
 #include "data_meta.h"
 #include <mysql.h>
@@ -51,4 +52,5 @@ private:
 };
 
 }
+#endif
 #endif //STDEX_DATA_SOURCE_MYSQL_H_

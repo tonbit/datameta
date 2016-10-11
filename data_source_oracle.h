@@ -1,5 +1,6 @@
 #ifndef STDEX_DATA_SOURCE_ORACLE_H_
 #define STDEX_DATA_SOURCE_ORACLE_H_
+#ifdef STDEX_HAS_ORACLE
 
 #include "data_meta.h"
 #include <ocilib.h>
@@ -29,4 +30,5 @@ private:
 };
 
 }
+#endif
 #endif //STDEX_DATA_SOURCE_ORACLE_H_

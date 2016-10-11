@@ -17,6 +17,7 @@
  * under the License.
  */
 
+#ifdef STDEX_HAS_MYSQL
 #include "data_source_mysql.h"
 namespace stdex {
 
@@ -709,3 +710,4 @@ string DataSourceMysql::last_error()
 }
 
 }
+#endif
