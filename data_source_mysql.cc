@@ -34,7 +34,7 @@ DataSourceMysql::~DataSourceMysql()
 	close();
 }
 
-bool DataSourceMysql::is_ready()
+bool DataSourceMysql::is_ready() const
 {
 	return _ready;
 }
