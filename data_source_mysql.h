@@ -30,7 +30,7 @@ class DataSourceMysql
 public:
 	DataSourceMysql();
 	~DataSourceMysql();
-	bool is_ready();
+	bool is_ready() const;
 
 	int open(const string &host, int port, const string &user, const string &passwd, const string &dbase);
 	void close();
@@ -41,8 +41,8 @@ public:
 	int execute(const string &sql, std::vector<Meta> &in, int64_t *affected=NULL);
 	int execute(const string &sql);
 
-	unsigned last_errno();
-	string last_error();
+	unsigned last_errno() const;
+	const char *last_error() const;
 
 private:
 	MYSQL _dbase;

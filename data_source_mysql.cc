@@ -699,14 +699,14 @@ int DataSourceMysql::execute(const string &sql)
 	return 0;
 }
 
-unsigned DataSourceMysql::last_errno()
+unsigned DataSourceMysql::last_errno() const
 {
 	return _errno;
 }
 
-string DataSourceMysql::last_error()
+const char *DataSourceMysql::last_error() const
 {
-	return _error;
+	return _error.c_str();
 }
 
 }

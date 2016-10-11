@@ -11,7 +11,7 @@ class DataSourceOracle
 public:
 	DataSourceOracle();
 	~DataSourceOracle();
-	bool is_ready();
+	bool is_ready() const;
 
 	int open(const string &host, int port, const string &user, const string &passwd, const string &dbase);
 	void close();
@@ -22,8 +22,8 @@ public:
 	int execute(const string &sql, std::vector<Meta> &in, i64 *affected);
 	int execute(const string &sql);
 
-	u32 last_errno();
-	const char *last_error();
+	unsigned last_errno() const;
+	const char *last_error() const;
 
 private:
 	OCI_ConnPool *pool;

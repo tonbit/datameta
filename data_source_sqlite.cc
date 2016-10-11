@@ -54,7 +54,7 @@ void DataSourceSqlite::close()
 	}
 }
 
-bool DataSourceSqlite::is_ready()
+bool DataSourceSqlite::is_ready() const
 {
 	if (db)
 		return true;
@@ -412,12 +412,12 @@ int DataSourceSqlite::execute(const string &sql)
 	return 0;
 }
 
-u32 DataSourceSqlite::last_errno()
+unsigned DataSourceSqlite::last_errno() const
 {
 	return sqlite3_errcode(db);
 }
 
-const char *DataSourceSqlite::last_error()
+const char *DataSourceSqlite::last_error() const
 {
 	return sqlite3_errmsg(db);
 }

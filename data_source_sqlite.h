@@ -14,7 +14,7 @@ public:
 
 	int open(const string &filename);
 	void close();
-	bool is_ready();
+	bool is_ready() const;
 
 	int query(const string &sql, std::vector<Meta> &in, std::vector<Meta> &row);
 	int query_all(const string &sql, std::vector<Meta> &in, std::vector<std::vector<Meta>> &rows);
@@ -22,8 +22,8 @@ public:
 	int execute(const string &sql, std::vector<Meta> &in, i64 *affected=NULL);
 	int execute(const string &sql);
 
-	u32 last_errno();
-	const char *last_error();
+	unsigned last_errno() const;
+	const char *last_error() const;
 
 private:
 	sqlite3 *db;

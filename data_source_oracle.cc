@@ -32,7 +32,7 @@ DataSourceOracle::~DataSourceOracle()
 	OCI_Cleanup();
 }
 
-bool DataSourceOracle::is_ready()
+bool DataSourceOracle::is_ready() const
 {
 	if (pool)
 		return true;
@@ -514,13 +514,13 @@ int DataSourceOracle::execute(const string &sql)
 	return 0;
 }
 
-u32 DataSourceOracle::last_errno()
+unsigned DataSourceOracle::last_errno() const
 {
 	OCI_Error *err = OCI_GetLastError();
 	return err ? OCI_ErrorGetOCICode(err) : -1;
 }
 
-const char *DataSourceOracle::last_error()
+const char *DataSourceOracle::last_error() const
 {
 	OCI_Error *err = OCI_GetLastError();
 	return err ? OCI_ErrorGetString(err) : "unknown ocilib error";
