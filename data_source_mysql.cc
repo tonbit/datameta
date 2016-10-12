@@ -48,6 +48,7 @@ int DataSourceMysql::open(const string &host, int port, const string &user, cons
 		return 1;
 	}
 
+	mysql_set_character_set(&_dbase, "utf8");
 	mysql_autocommit(&_dbase, 1);
 	_ready = true;
 	return 0;
