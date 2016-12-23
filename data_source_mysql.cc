@@ -50,6 +50,10 @@ int DataSourceMysql::open(const string &host, int port, const string &user, cons
 
 	mysql_set_character_set(&_dbase, "utf8");
 	mysql_autocommit(&_dbase, 1);
+
+	my_bool reconnect = 1;
+	mysql_options(&_dbase, MYSQL_OPT_RECONNECT, &reconnect);
+
 	_ready = true;
 	return 0;
 }
