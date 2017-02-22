@@ -84,6 +84,12 @@ public:
         _number.number_i32 = (int32_t)val;
     }
 
+    inline Meta(size_t val)
+    {
+        type = TYPE_INT;
+        _number.number_i32 = (int32_t)val;
+    }
+	
     inline Meta(int64_t val)
     {
         type = TYPE_BIGINT;
