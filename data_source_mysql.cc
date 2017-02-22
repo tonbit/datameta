@@ -406,7 +406,7 @@ int DataSourceMysql::query_all(const string &sql, std::vector<Meta> &in, std::ve
 		my_bool &isnull = isnull_vec[i];
 		ulong &length = length_vec[i];
 
-		if (field.type == MYSQL_TYPE_LONG)
+		if (field.type == MYSQL_TYPE_TINY || field.type == MYSQL_TYPE_SHORT || field.type == MYSQL_TYPE_LONG)
 		{
 			meta = (int32_t)0;
 			int32_t &val = meta.int_ref();
