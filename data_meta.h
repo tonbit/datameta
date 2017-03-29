@@ -84,11 +84,13 @@ public:
         _number.number_i32 = (int32_t)val;
     }
 
+#ifndef _MSC_VER
     inline Meta(size_t val)
     {
         type = TYPE_INT;
         _number.number_i32 = (int32_t)val;
     }
+#endif
 	
     inline Meta(int64_t val)
     {
