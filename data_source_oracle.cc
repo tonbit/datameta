@@ -526,5 +526,15 @@ const char *DataSourceOracle::last_error() const
 	return err ? OCI_ErrorGetString(err) : "unknown ocilib error";
 }
 
+int DataSourceOracle::get_magic() const
+{
+	return _magic;
+}
+
+void DataSourceOracle::set_magic(int v)
+{
+	_magic = v;
+}
+
 }
 #endif

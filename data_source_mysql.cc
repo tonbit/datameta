@@ -23,7 +23,8 @@ namespace stdex {
 
 DataSourceMysql::DataSourceMysql()
 {
-	mysql_init(&_dbase);
+	_dbase = new MYSQL();
+	mysql_init(_dbase);
 	_ready = false;
 	_errno = 0;
 	_error = "";
@@ -32,6 +33,7 @@ DataSourceMysql::DataSourceMysql()
 DataSourceMysql::~DataSourceMysql()
 {
 	close();
+	delete _dbase;
 }
 
 bool DataSourceMysql::is_ready() const
@@ -41,18 +43,18 @@ bool DataSourceMysql::is_ready() const
 
 int DataSourceMysql::open(const string &host, int port, const string &user, const string &passwd, const string &dbase)
 {
-	if (!mysql_real_connect(&_dbase, host.c_str(), user.c_str(), passwd.c_str(), dbase.c_str(), port, NULL, 0))
+	if (!mysql_real_connect(_dbase, host.c_str(), user.c_str(), passwd.c_str(), dbase.c_str(), port, NULL, 0))
 	{
-		_errno = mysql_errno(&_dbase);
-		_error = mysql_error(&_dbase);
+		_errno = mysql_errno(_dbase);
+		_error = mysql_error(_dbase);
 		return 1;
 	}
 
-	mysql_set_character_set(&_dbase, "utf8");
-	mysql_autocommit(&_dbase, 1);
+	mysql_set_character_set(_dbase, "utf8");
+	mysql_autocommit(_dbase, 1);
 
 	my_bool reconnect = 1;
-	mysql_options(&_dbase, MYSQL_OPT_RECONNECT, &reconnect);
+	mysql_options(_dbase, MYSQL_OPT_RECONNECT, &reconnect);
 
 	_ready = true;
 	return 0;
@@ -62,25 +64,25 @@ void DataSourceMysql::close()
 {
 	if (_ready)
 	{
-		mysql_close(&_dbase);
+		mysql_close(_dbase);
 		_ready = false;
 	}
 }
 
 int DataSourceMysql::query(const string &sql, std::vector<Meta> &in, std::vector<Meta> &row)
 {
-	MYSQL_STMT *stmt = mysql_stmt_init(&_dbase);
+	MYSQL_STMT *stmt = mysql_stmt_init(_dbase);
 	if (!stmt)
 	{
-		_errno = mysql_errno(&_dbase);
-		_error = mysql_error(&_dbase);
+		_errno = mysql_errno(_dbase);
+		_error = mysql_error(_dbase);
 		return 1;
 	}
 
 	if (mysql_stmt_prepare(stmt, sql.c_str(), sql.size()))
 	{
-		_errno = mysql_errno(&_dbase);
-		_error = mysql_error(&_dbase);
+		_errno = mysql_errno(_dbase);
+		_error = mysql_error(_dbase);
 		mysql_stmt_close(stmt);
 		return 2;
 	}
@@ -147,8 +149,8 @@ int DataSourceMysql::query(const string &sql, std::vector<Meta> &in, std::vector
 
 		if (mysql_stmt_bind_param(stmt, &param_binds[0]))
 		{
-			_errno = mysql_errno(&_dbase);
-			_error = mysql_error(&_dbase);
+			_errno = mysql_errno(_dbase);
+			_error = mysql_error(_dbase);
 			mysql_stmt_close(stmt);
 			return 3;
 		}
@@ -156,8 +158,8 @@ int DataSourceMysql::query(const string &sql, std::vector<Meta> &in, std::vector
 
 	if (mysql_stmt_execute(stmt))
 	{
-		_errno = mysql_errno(&_dbase);
-		_error = mysql_error(&_dbase);
+		_errno = mysql_errno(_dbase);
+		_error = mysql_error(_dbase);
 		mysql_stmt_close(stmt);
 		return 4;
 	}
@@ -165,8 +167,8 @@ int DataSourceMysql::query(const string &sql, std::vector<Meta> &in, std::vector
 	MYSQL_RES *result_meta = mysql_stmt_result_metadata(stmt);
 	if (!result_meta)
 	{
-		_errno = mysql_errno(&_dbase);
-		_error = mysql_error(&_dbase);
+		_errno = mysql_errno(_dbase);
+		_error = mysql_error(_dbase);
 		mysql_stmt_close(stmt);
 		return 5;
 	}
@@ -246,8 +248,8 @@ int DataSourceMysql::query(const string &sql, std::vector<Meta> &in, std::vector
 
 	if (mysql_stmt_bind_result(stmt, &result_binds[0]))
 	{
-		_errno = mysql_errno(&_dbase);
-		_error = mysql_error(&_dbase);
+		_errno = mysql_errno(_dbase);
+		_error = mysql_error(_dbase);
 		mysql_stmt_close(stmt);
 		return 6;
 	}
@@ -255,8 +257,8 @@ int DataSourceMysql::query(const string &sql, std::vector<Meta> &in, std::vector
 	int ret = mysql_stmt_fetch(stmt);
 	if (ret)
 	{
-		_errno = mysql_errno(&_dbase);
-		_error = mysql_error(&_dbase);
+		_errno = mysql_errno(_dbase);
+		_error = mysql_error(_dbase);
 		mysql_stmt_close(stmt);
 		return 7;
 	}
@@ -280,18 +282,18 @@ int DataSourceMysql::query(const string &sql, std::vector<Meta> &in, std::vector
 
 int DataSourceMysql::query_all(const string &sql, std::vector<Meta> &in, std::vector<std::vector<Meta>> &rows)
 {
-	MYSQL_STMT *stmt = mysql_stmt_init(&_dbase);
+	MYSQL_STMT *stmt = mysql_stmt_init(_dbase);
 	if (!stmt)
 	{
-		_errno = mysql_errno(&_dbase);
-		_error = mysql_error(&_dbase);
+		_errno = mysql_errno(_dbase);
+		_error = mysql_error(_dbase);
 		return 1;
 	}
 
 	if (mysql_stmt_prepare(stmt, sql.c_str(), sql.size()))
 	{
-		_errno = mysql_errno(&_dbase);
-		_error = mysql_error(&_dbase);
+		_errno = mysql_errno(_dbase);
+		_error = mysql_error(_dbase);
 		mysql_stmt_close(stmt);
 		return 2;
 	}
@@ -358,8 +360,8 @@ int DataSourceMysql::query_all(const string &sql, std::vector<Meta> &in, std::ve
 
 		if (mysql_stmt_bind_param(stmt, &param_binds[0]))
 		{
-			_errno = mysql_errno(&_dbase);
-			_error = mysql_error(&_dbase);
+			_errno = mysql_errno(_dbase);
+			_error = mysql_error(_dbase);
 			mysql_stmt_close(stmt);
 			return 3;
 		}
@@ -367,8 +369,8 @@ int DataSourceMysql::query_all(const string &sql, std::vector<Meta> &in, std::ve
 
 	if (mysql_stmt_execute(stmt))
 	{
-		_errno = mysql_errno(&_dbase);
-		_error = mysql_error(&_dbase);
+		_errno = mysql_errno(_dbase);
+		_error = mysql_error(_dbase);
 		mysql_stmt_close(stmt);
 		return 4;
 	}
@@ -376,8 +378,8 @@ int DataSourceMysql::query_all(const string &sql, std::vector<Meta> &in, std::ve
 	MYSQL_RES *result_meta = mysql_stmt_result_metadata(stmt);
 	if (!result_meta)
 	{
-		_errno = mysql_errno(&_dbase);
-		_error = mysql_error(&_dbase);
+		_errno = mysql_errno(_dbase);
+		_error = mysql_error(_dbase);
 		mysql_stmt_close(stmt);
 		return 5;
 	}
@@ -458,8 +460,8 @@ int DataSourceMysql::query_all(const string &sql, std::vector<Meta> &in, std::ve
 
 	if (mysql_stmt_bind_result(stmt, &result_binds[0]))
 	{
-		_errno = mysql_errno(&_dbase);
-		_error = mysql_error(&_dbase);
+		_errno = mysql_errno(_dbase);
+		_error = mysql_error(_dbase);
 		mysql_stmt_close(stmt);
 		return 6;
 	}
@@ -491,18 +493,18 @@ int DataSourceMysql::query_all(const string &sql, std::vector<Meta> &in, std::ve
 
 int DataSourceMysql::insert(const string &sql, std::vector<Meta> &in, int64_t *insert_id)
 {
-	MYSQL_STMT *stmt = mysql_stmt_init(&_dbase);
+	MYSQL_STMT *stmt = mysql_stmt_init(_dbase);
 	if (!stmt)
 	{
-		_errno = mysql_errno(&_dbase);
-		_error = mysql_error(&_dbase);
+		_errno = mysql_errno(_dbase);
+		_error = mysql_error(_dbase);
 		return 1;
 	}
 
 	if (mysql_stmt_prepare(stmt, sql.c_str(), sql.size()))
 	{
-		_errno = mysql_errno(&_dbase);
-		_error = mysql_error(&_dbase);
+		_errno = mysql_errno(_dbase);
+		_error = mysql_error(_dbase);
 		mysql_stmt_close(stmt);
 		return 2;
 	}
@@ -569,16 +571,16 @@ int DataSourceMysql::insert(const string &sql, std::vector<Meta> &in, int64_t *i
 
 		if (mysql_stmt_bind_param(stmt, &param_binds[0]))
 		{
-			_errno = mysql_errno(&_dbase);
-			_error = mysql_error(&_dbase);
+			_errno = mysql_errno(_dbase);
+			_error = mysql_error(_dbase);
 			return 3;
 		}
 	}
 
 	if (mysql_stmt_execute(stmt))
 	{
-		_errno = mysql_errno(&_dbase);
-		_error = mysql_error(&_dbase);
+		_errno = mysql_errno(_dbase);
+		_error = mysql_error(_dbase);
 		mysql_stmt_close(stmt);
 		return 4;
 	}
@@ -592,18 +594,18 @@ int DataSourceMysql::insert(const string &sql, std::vector<Meta> &in, int64_t *i
 
 int DataSourceMysql::execute(const string &sql, std::vector<Meta> &in, int64_t *affected)
 {
-	MYSQL_STMT *stmt = mysql_stmt_init(&_dbase);
+	MYSQL_STMT *stmt = mysql_stmt_init(_dbase);
 	if (!stmt)
 	{
-		_errno = mysql_errno(&_dbase);
-		_error = mysql_error(&_dbase);
+		_errno = mysql_errno(_dbase);
+		_error = mysql_error(_dbase);
 		return 1;
 	}
 
 	if (mysql_stmt_prepare(stmt, sql.c_str(), sql.size()))
 	{
-		_errno = mysql_errno(&_dbase);
-		_error = mysql_error(&_dbase);
+		_errno = mysql_errno(_dbase);
+		_error = mysql_error(_dbase);
 		mysql_stmt_close(stmt);
 		return 2;
 	}
@@ -670,8 +672,8 @@ int DataSourceMysql::execute(const string &sql, std::vector<Meta> &in, int64_t *
 
 		if (mysql_stmt_bind_param(stmt, &param_binds[0]))
 		{
-			_errno = mysql_errno(&_dbase);
-			_error = mysql_error(&_dbase);
+			_errno = mysql_errno(_dbase);
+			_error = mysql_error(_dbase);
 			mysql_stmt_close(stmt);
 			return 3;
 		}
@@ -679,8 +681,8 @@ int DataSourceMysql::execute(const string &sql, std::vector<Meta> &in, int64_t *
 
 	if (mysql_stmt_execute(stmt))
 	{
-		_errno = mysql_errno(&_dbase);
-		_error = mysql_error(&_dbase);
+		_errno = mysql_errno(_dbase);
+		_error = mysql_error(_dbase);
 		mysql_stmt_close(stmt);
 		return 4;
 	}
@@ -694,10 +696,10 @@ int DataSourceMysql::execute(const string &sql, std::vector<Meta> &in, int64_t *
 
 int DataSourceMysql::execute(const string &sql)
 {
-	if (mysql_query(&_dbase, sql.c_str()))
+	if (mysql_query(_dbase, sql.c_str()))
 	{
-		_errno = mysql_errno(&_dbase);
-		_error = mysql_error(&_dbase);
+		_errno = mysql_errno(_dbase);
+		_error = mysql_error(_dbase);
 		return 1;
 	}
 
@@ -712,6 +714,16 @@ unsigned DataSourceMysql::last_errno() const
 const char *DataSourceMysql::last_error() const
 {
 	return _error.c_str();
+}
+
+int DataSourceMysql::get_magic() const
+{
+	return _magic;
+}
+
+void DataSourceMysql::set_magic(int v)
+{
+	_magic = v;
 }
 
 }

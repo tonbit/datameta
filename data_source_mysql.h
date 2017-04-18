@@ -44,11 +44,15 @@ public:
 	unsigned last_errno() const;
 	const char *last_error() const;
 
+	int get_magic() const;
+	void set_magic(int v);
+
 private:
-	MYSQL _dbase;
+	MYSQL *_dbase;
 	bool _ready;
 	unsigned _errno;
 	string _error;
+	int _magic;
 };
 
 }

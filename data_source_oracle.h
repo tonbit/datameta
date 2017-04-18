@@ -25,8 +25,12 @@ public:
 	unsigned last_errno() const;
 	const char *last_error() const;
 
+	int get_magic() const;
+	void set_magic(int v);
+
 private:
 	OCI_ConnPool *pool;
+	int _magic;
 };
 
 }

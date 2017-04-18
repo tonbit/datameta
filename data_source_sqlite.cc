@@ -422,5 +422,15 @@ const char *DataSourceSqlite::last_error() const
 	return sqlite3_errmsg(db);
 }
 
+int DataSourceSqlite::get_magic() const
+{
+	return _magic;
+}
+
+void DataSourceSqlite::set_magic(int v)
+{
+	_magic = v;
+}
+
 }
 #endif
