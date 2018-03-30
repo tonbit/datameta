@@ -288,7 +288,7 @@ public:
         return _string;
     }
 
-    inline string&& move_string() const
+    inline string&& move_string()
     {
         return std::move(_string);
     }
