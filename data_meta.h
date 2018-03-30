@@ -288,6 +288,11 @@ public:
         return _string;
     }
 
+    inline string&& move_string() const
+    {
+        return std::move(_string);
+    }
+
     inline string to_string() const
     {
     	if (type == TYPE_INT)
