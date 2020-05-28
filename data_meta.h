@@ -72,6 +72,20 @@ public:
             _number = other._number;
     }
 
+#ifdef _MSC_VER
+    inline Meta(size_t val)
+    {
+        type = TYPE_INT;
+        _number.number_i32 = (int32_t)val;
+    }
+
+	inline Meta(long val)
+	{
+		type = TYPE_INT;
+		_number.number_i32 = (int32_t)val;
+	}
+#endif	
+	
     inline Meta(int32_t val)
     {
         type = TYPE_INT;
@@ -84,20 +98,18 @@ public:
         _number.number_i32 = (int32_t)val;
     }
 
-#ifndef _MSC_VER
-    inline Meta(size_t val)
-    {
-        type = TYPE_INT;
-        _number.number_i32 = (int32_t)val;
-    }
-#endif
-	
     inline Meta(int64_t val)
     {
         type = TYPE_BIGINT;
         _number.number_i64 = val;
     }
 
+    inline Meta(uint64_t val)
+    {
+        type = TYPE_BIGINT;
+        _number.number_i64 = val;
+    }
+	
     inline Meta(float val)
     {
         type = TYPE_FLOAT;
