@@ -350,6 +350,7 @@ private:
     	int64_t number_i64;
     	float number_f32;
     	double number_f64;
+		Number() : number_i64(0) {}
     };
 
     Number _number;
