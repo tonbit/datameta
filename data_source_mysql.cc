@@ -65,6 +65,7 @@ void DataSourceMysql::close()
 	if (_ready)
 	{
 		mysql_close(_dbase);
+		mysql_init(_dbase);
 		_ready = false;
 	}
 }
